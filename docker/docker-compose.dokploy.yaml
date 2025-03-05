@@ -506,8 +506,8 @@ services:
       interval: 1s
       timeout: 3s
       retries: 30
-    expose:
-      - '5432'
+    ports:
+      - '${EXPOSE_DB_PORT:-5432}:5432'
     networks:
       - dify_network
 
@@ -568,8 +568,8 @@ services:
       PLUGIN_REMOTE_INSTALLING_PORT: ${PLUGIN_DEBUGGING_PORT:-5003}
       PLUGIN_WORKING_PATH: ${PLUGIN_WORKING_PATH:-/app/storage/cwd}
       FORCE_VERIFYING_SIGNATURE: ${FORCE_VERIFYING_SIGNATURE:-true}
-    expose:
-      - "${PLUGIN_DEBUGGING_PORT:-5003}"
+    ports:
+      - "${EXPOSE_PLUGIN_DEBUGGING_PORT:-5003}:${PLUGIN_DEBUGGING_PORT:-5003}"
     volumes:
       - ./volumes/plugin_daemon:/app/storage
     networks:
@@ -948,8 +948,8 @@ services:
       - ./volumes/myscale/data:/var/lib/clickhouse
       - ./volumes/myscale/log:/var/log/clickhouse-server
       - ./volumes/myscale/config/users.d/custom_users_config.xml:/etc/clickhouse-server/users.d/custom_users_config.xml
-    expose:
-      - ${MYSCALE_PORT:-8123}
+    ports:
+      - ${MYSCALE_PORT:-8123}:${MYSCALE_PORT:-8123}
     networks:
       - dify_network
 
@@ -975,8 +975,8 @@ services:
       xpack.security.enabled: 'true'
       xpack.security.enrollment.enabled: 'false'
       xpack.security.http.ssl.enabled: 'false'
-    expose:
-      - 9200
+    ports:
+      - ${ELASTICSEARCH_PORT:-9200}:9200
     deploy:
       resources:
         limits:
@@ -1010,8 +1010,8 @@ services:
       I18N_LOCALE: zh-CN
       SERVER_PORT: '5601'
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-    expose:
-      - 5601
+    ports:
+      - ${KIBANA_PORT:-5601}:5601
     healthcheck:
       test: [ 'CMD-SHELL', 'curl -s http://localhost:5601 >/dev/null || exit 1' ]
       interval: 30s
