@@ -1000,7 +1000,6 @@ services:
 networks:
   dify-network:
     driver: bridge
-    internal: true
 
 volumes:
   dify-data:
