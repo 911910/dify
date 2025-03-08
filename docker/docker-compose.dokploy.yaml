@@ -28,11 +28,11 @@ x-shared-env: &shared-api-worker-env
   APP_MAX_EXECUTION_TIME: ${APP_MAX_EXECUTION_TIME:-1200}
   DIFY_BIND_ADDRESS: ${DIFY_BIND_ADDRESS:-0.0.0.0}
   DIFY_PORT: ${DIFY_PORT:-5001}
-  SERVER_WORKER_AMOUNT: ${SERVER_WORKER_AMOUNT:-1}
+  SERVER_WORKER_AMOUNT: ${SERVER_WORKER_AMOUNT:-2}
   SERVER_WORKER_CLASS: ${SERVER_WORKER_CLASS:-gevent}
   SERVER_WORKER_CONNECTIONS: ${SERVER_WORKER_CONNECTIONS:-10}
-  CELERY_WORKER_CLASS: ${CELERY_WORKER_CLASS:-}
   GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-360}
+  CELERY_WORKER_CLASS: ${CELERY_WORKER_CLASS:-}
   CELERY_WORKER_AMOUNT: ${CELERY_WORKER_AMOUNT:-}
   CELERY_AUTO_SCALE: ${CELERY_AUTO_SCALE:-false}
   CELERY_MAX_WORKERS: ${CELERY_MAX_WORKERS:-}
@@ -54,22 +54,29 @@ x-shared-env: &shared-api-worker-env
   POSTGRES_EFFECTIVE_CACHE_SIZE: ${POSTGRES_EFFECTIVE_CACHE_SIZE:-4096MB}
   REDIS_HOST: ${REDIS_HOST:-redis}
   REDIS_PORT: ${REDIS_PORT:-6379}
-  REDIS_USERNAME: ${REDIS_USERNAME:-}
   REDIS_PASSWORD: ${REDIS_PASSWORD:-difyai123456}
-  REDIS_USE_SSL: ${REDIS_USE_SSL:-false}
   REDIS_DB: ${REDIS_DB:-0}
   CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://:difyai123456@redis:6379/1}
   WEB_API_CORS_ALLOW_ORIGINS: ${WEB_API_CORS_ALLOW_ORIGINS:-*}
   CONSOLE_CORS_ALLOW_ORIGINS: ${CONSOLE_CORS_ALLOW_ORIGINS:-*}
+
+  # S3 (Cloudflare R2) file storage config
   STORAGE_TYPE: ${STORAGE_TYPE:-s3}
   S3_ENDPOINT: ${S3_ENDPOINT:-}
   S3_BUCKET_NAME: ${S3_BUCKET_NAME:-dify-bucket}
   S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
   S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+
+  # Weaviate vector DB
+  VECTOR_STORE: ${VECTOR_STORE:-weaviate}
   WEAVIATE_ENDPOINT: ${WEAVIATE_ENDPOINT:-http://weaviate:8080}
   WEAVIATE_API_KEY: ${WEAVIATE_API_KEY:-}
+
+  # Sandbox
   CODE_EXECUTION_ENDPOINT: ${CODE_EXECUTION_ENDPOINT:-http://sandbox:8194}
   CODE_EXECUTION_API_KEY: ${CODE_EXECUTION_API_KEY:-dify-sandbox}
+
+  # Plugin Daemon
   DB_PLUGIN_DATABASE: ${DB_PLUGIN_DATABASE:-dify_plugin}
   PLUGIN_DAEMON_PORT: ${PLUGIN_DAEMON_PORT:-5002}
   PLUGIN_DAEMON_KEY: ${PLUGIN_DAEMON_KEY:-xxxxxxx}
@@ -82,12 +89,28 @@ x-shared-env: &shared-api-worker-env
   PLUGIN_DIFY_INNER_API_URL: ${PLUGIN_DIFY_INNER_API_URL:-http://api:5001}
   ENDPOINT_URL_TEMPLATE: ${ENDPOINT_URL_TEMPLATE:-}
   FORCE_VERIFYING_SIGNATURE: ${FORCE_VERIFYING_SIGNATURE:-true}
-  # 如果你还有其它变量，继续添加
+
+  # Mail
+  MAIL_TYPE: ${MAIL_TYPE:-resend}
+  MAIL_DEFAULT_SEND_FROM: ${MAIL_DEFAULT_SEND_FROM:-}
+  RESEND_API_URL: ${RESEND_API_URL:-https://api.resend.com}
+  RESEND_API_KEY: ${RESEND_API_KEY:-}
+  # SMTP (only if MAIL_TYPE=smtp)
+  SMTP_SERVER: ${SMTP_SERVER:-}
+  SMTP_PORT: ${SMTP_PORT:-465}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+  SMTP_OPPORTUNISTIC_TLS: ${SMTP_OPPORTUNISTIC_TLS:-false}
+
+  # Notion
+  NOTION_INTEGRATION_TYPE: ${NOTION_INTEGRATION_TYPE:-public}
+  NOTION_CLIENT_SECRET: ${NOTION_CLIENT_SECRET:-}
+  NOTION_CLIENT_ID: ${NOTION_CLIENT_ID:-}
+  NOTION_INTERNAL_SECRET: ${NOTION_INTERNAL_SECRET:-}
 
 services:
-  # ---------------------
-  #  1) API Service
-  # ---------------------
+  # 1) API service
   api:
     image: langgenius/dify-api:1.0.0
     restart: always
@@ -97,15 +120,12 @@ services:
     depends_on:
       - db
       - redis
-    # 这里是否需要挂载存储，视你需求而定：
     volumes:
       - ./volumes/app/storage:/app/api/storage
     networks:
       - dify-network
 
-  # ---------------------
-  #  2) Celery Worker
-  # ---------------------
+  # 2) Celery Worker
   worker:
     image: langgenius/dify-api:1.0.0
     restart: always
@@ -120,22 +140,17 @@ services:
     networks:
       - dify-network
 
-  # ---------------------
-  #  3) Web Frontend
-  # ---------------------
+  # 3) Web Frontend
   web:
     image: langgenius/dify-web:1.0.0
     restart: always
     environment:
       CONSOLE_API_URL: ${CONSOLE_API_URL:-}
       APP_API_URL: ${APP_API_URL:-}
-      # 需要的话可以在此处加入Sentry配置等
     networks:
       - dify-network
 
-  # ---------------------
-  #  4) Postgres Database
-  # ---------------------
+  # 4) Postgres Database
   db:
     image: postgres:15-alpine
     restart: always
@@ -157,15 +172,12 @@ services:
       interval: 1s
       timeout: 3s
       retries: 30
-    # 如果你需要数据库在宿主机可见，可以映射端口
     ports:
       - '${EXPOSE_DB_PORT:-5432}:5432'
     networks:
       - dify-network
 
-  # ---------------------
-  #  5) Redis Cache
-  # ---------------------
+  # 5) Redis Cache
   redis:
     image: redis:6-alpine
     restart: always
@@ -177,9 +189,7 @@ services:
     networks:
       - dify-network
 
-  # ---------------------
-  #  6) Sandbox (代码沙箱)
-  # ---------------------
+  # 6) Sandbox
   sandbox:
     image: langgenius/dify-sandbox:0.2.10
     restart: always
@@ -199,9 +209,7 @@ services:
     networks:
       - dify-network
 
-  # ---------------------
-  #  7) Plugin Daemon
-  # ---------------------
+  # 7) Plugin Daemon
   plugin_daemon:
     image: langgenius/dify-plugin-daemon:0.0.3-local
     restart: always
@@ -227,9 +235,7 @@ services:
     networks:
       - dify-network
 
-  # ---------------------
-  #  8) SSRF Proxy (Squid)
-  # ---------------------
+  # 8) SSRF Proxy
   ssrf_proxy:
     image: ubuntu/squid:latest
     restart: always
@@ -246,9 +252,7 @@ services:
     networks:
       - dify-network
 
-  # ---------------------
-  #  9) Nginx Reverse Proxy
-  # ---------------------
+  # 9) Nginx Reverse Proxy
   nginx:
     image: nginx:latest
     restart: always
@@ -258,7 +262,10 @@ services:
       - ./nginx/https.conf.template:/etc/nginx/https.conf.template
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/docker-entrypoint.sh:/docker-entrypoint-mount.sh
-      - ./nginx/ssl:/etc/ssl  # 如果你需要手动放置证书
+      - ./nginx/ssl:/etc/ssl  # for manual cert
+      - ./volumes/certbot/conf/live:/etc/letsencrypt/live # for certbot synergy
+      - ./volumes/certbot/conf:/etc/letsencrypt
+      - ./volumes/certbot/www:/var/www/html
     entrypoint: [ 'sh', '-c', "cp /docker-entrypoint-mount.sh /docker-entrypoint.sh && sed -i 's/\\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh && /docker-entrypoint.sh" ]
     environment:
       NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-_}
@@ -284,9 +291,7 @@ services:
     networks:
       - dify-network
 
-  # ---------------------
   # 10) Weaviate (vector DB)
-  # ---------------------
   weaviate:
     image: semitechnologies/weaviate:1.19.0
     restart: always
@@ -300,11 +305,11 @@ services:
       CLUSTER_HOSTNAME: node1
       AUTHENTICATION_APIKEY_ENABLED: true
       AUTHORIZATION_ADMINLIST_ENABLED: true
-      # 如果你有API Key或其他配置，在这里设置
     networks:
       - dify-network
 
- certbot:
+  # 11) certbot (Profile-based)
+  certbot:
     image: certbot/certbot
     profiles:
       - certbot
@@ -316,19 +321,22 @@ services:
       - ./certbot/update-cert.template.txt:/update-cert.template.txt
       - ./certbot/docker-entrypoint.sh:/docker-entrypoint.sh
     environment:
-      - CERTBOT_EMAIL=${CERTBOT_EMAIL:-somebody@example.com}
-      - CERTBOT_DOMAIN=${CERTBOT_DOMAIN:-your-domain.com}
+      - CERTBOT_EMAIL=${CERTBOT_EMAIL:-someone@example.com}
+      - CERTBOT_DOMAIN=${CERTBOT_DOMAIN:-example.com}
       - CERTBOT_OPTIONS=${CERTBOT_OPTIONS:-}
     entrypoint: [ '/docker-entrypoint.sh' ]
     command: [ 'tail', '-f', '/dev/null' ]
     networks:
       - dify-network
-      
+
 networks:
   dify-network:
     driver: bridge
     internal: true
 
 volumes:
-  # db服务用的命名卷
+  # Postgres data named volume
   db_data:
+  # Certbot volumes for storing certs/logs
+  # (these are bind-mounted in the service itself, so no named volume needed for them, 
+  #  but you can define them as named volumes if you prefer.)
