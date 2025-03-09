@@ -1064,7 +1064,6 @@ networks:
     internal: true
   dify_network:
     driver: bridge
-    internal: true
 
 volumes:
   oradata:
